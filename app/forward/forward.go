@@ -34,6 +34,7 @@ type Options struct {
 	Edit   string
 	Mode   forwarder.Mode
 	Silent bool
+	SilentProgress bool
 	DryRun bool
 	Single bool
 	Desc   bool
@@ -78,9 +79,16 @@ func Run(ctx context.Context, c *telegram.Client, kvd storage.Storage, opts Opti
 		return errors.Wrap(err, "resolve edit")
 	}
 
-	fwProgress := prog.New(pw.FormatNumber)
-	fwProgress.SetNumTrackersExpected(totalMessages(dialogs))
-	prog.EnablePS(ctx, fwProgress)
+	var progress forwarder.Progress = newSilentProgress()
+	var fwProgress pw.Writer
+	if !opts.SilentProgress {
+		fwProgress = prog.New(pw.FormatNumber)
+		fwProgress.SetNumTrackersExpected(totalMessages(dialogs))
+		prog.EnablePS(ctx, fwProgress)
+		progress = newProgress(fwProgress)
+		go fwProgress.Render()
+		defer prog.Wait(ctx, fwProgress)
+	}
 
 	fw := forwarder.New(forwarder.Options{
 		Pool: pool,
@@ -96,12 +104,9 @@ func Run(ctx context.Context, c *telegram.Client, kvd storage.Storage, opts Opti
 			grouped: !opts.Single,
 			delay:   viper.GetDuration(consts.FlagDelay),
 		}),
-		Progress: newProgress(fwProgress),
+		Progress: progress,
 		Threads:  viper.GetInt(consts.FlagThreads),
 	})
-
-	go fwProgress.Render()
-	defer prog.Wait(ctx, fwProgress)
 
 	return fw.Forward(ctx)
 }

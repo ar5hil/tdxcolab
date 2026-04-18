@@ -182,6 +182,14 @@ Send messages without notification.
 tdl forward --from tdl-export.json --silent
 {{< /command >}}
 
+## Silent Progress
+
+Disable animated progress rendering and print concise forwarding status lines instead.
+
+{{< command >}}
+tdl forward --from tdl-export.json --silent-progress
+{{< /command >}}
+
 ## No Grouped Detection
 
 By default, tdl will detect grouped messages and forward them as an album.

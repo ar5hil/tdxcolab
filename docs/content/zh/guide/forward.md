@@ -184,6 +184,14 @@ tdl forward --from tdl-export.json --dry-run
 tdl forward --from tdl-export.json --silent
 {{< /command >}}
 
+## 静默进度
+
+禁用动画进度渲染，仅输出简洁的转发状态行。
+
+{{< command >}}
+tdl forward --from tdl-export.json --silent-progress
+{{< /command >}}
+
 ## 取消分组检测
 
 默认情况下，tdl 将自动探测到分组消息并将它们转发为合并的消息。
