@@ -21,17 +21,25 @@ import (
 )
 
 type iterOptions struct {
-	manager *peers.Manager
-	pool    dcpool.Pool
-	to      *vm.Program
-	edit    *vm.Program
-	dialogs []*tmessage.Dialog
-	mode    forwarder.Mode
-	silent  bool
-	dryRun  bool
-	grouped bool
-	delay   time.Duration
+	manager  *peers.Manager
+	pool     dcpool.Pool
+	to       *vm.Program
+	edit     *vm.Program
+	dialogs  []*tmessage.Dialog
+	cleanups map[cleanupKey]cleanupFunc
+	mode     forwarder.Mode
+	silent   bool
+	dryRun   bool
+	grouped  bool
+	delay    time.Duration
 }
+
+type cleanupKey struct {
+	from int64
+	msg  int
+}
+
+type cleanupFunc func(ctx context.Context) error
 
 type iter struct {
 	opts iterOptions
@@ -153,6 +161,11 @@ func (i *iter) Next(ctx context.Context) bool {
 	}
 
 	var modeOverride forwarder.Mode = -1 // default value is invalid
+	var cleanup cleanupFunc
+	if i.opts.cleanups != nil {
+		cleanup = i.opts.cleanups[cleanupKey{from: from.ID(), msg: msg.ID}]
+	}
+
 	// edit message
 	if i.opts.edit != nil {
 		result, err = texpr.Run(i.opts.edit, exprEnv(from, msg))
@@ -193,6 +206,7 @@ func (i *iter) Next(ctx context.Context) bool {
 		to:           to,
 		thread:       thread,
 		modeOverride: modeOverride,
+		cleanup:      cleanup,
 		opts:         i.opts,
 	}
 

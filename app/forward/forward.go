@@ -29,15 +29,18 @@ import (
 )
 
 type Options struct {
-	From   []string
-	To     string
-	Edit   string
-	Mode   forwarder.Mode
-	Silent bool
+	From           []string
+	FromSupa       []string
+	To             string
+	Edit           string
+	Mode           forwarder.Mode
+	Silent         bool
 	SilentProgress bool
-	DryRun bool
-	Single bool
-	Desc   bool
+	DryRun         bool
+	Single         bool
+	Desc           bool
+	AutoClean      bool
+	SupabaseConfig string
 }
 
 func Run(ctx context.Context, c *telegram.Client, kvd storage.Storage, opts Options) (rerr error) {
@@ -62,7 +65,7 @@ func Run(ctx context.Context, c *telegram.Client, kvd storage.Storage, opts Opti
 
 	ctx = tctx.WithPool(ctx, pool)
 
-	dialogs, err := collectDialogs(ctx, opts.From, opts.Desc)
+	dialogs, cleanups, err := collectDialogs(ctx, opts.From, opts.FromSupa, opts.Desc, opts.AutoClean, opts.SupabaseConfig)
 	if err != nil {
 		return errors.Wrap(err, "collect dialogs")
 	}
@@ -93,26 +96,36 @@ func Run(ctx context.Context, c *telegram.Client, kvd storage.Storage, opts Opti
 	fw := forwarder.New(forwarder.Options{
 		Pool: pool,
 		Iter: newIter(iterOptions{
-			manager: manager,
-			pool:    pool,
-			to:      to,
-			edit:    edit,
-			dialogs: dialogs,
-			mode:    opts.Mode,
-			silent:  opts.Silent,
-			dryRun:  opts.DryRun,
-			grouped: !opts.Single,
-			delay:   viper.GetDuration(consts.FlagDelay),
+			manager:  manager,
+			pool:     pool,
+			to:       to,
+			edit:     edit,
+			dialogs:  dialogs,
+			cleanups: cleanups,
+			mode:     opts.Mode,
+			silent:   opts.Silent,
+			dryRun:   opts.DryRun,
+			grouped:  !opts.Single,
+			delay:    viper.GetDuration(consts.FlagDelay),
 		}),
-		Progress: progress,
-		Threads:  viper.GetInt(consts.FlagThreads),
+		Progress:  progress,
+		Threads:   viper.GetInt(consts.FlagThreads),
+		AutoClean: opts.AutoClean,
 	})
 
 	return fw.Forward(ctx)
 }
 
-func collectDialogs(ctx context.Context, input []string, desc bool) ([]*tmessage.Dialog, error) {
+func collectDialogs(
+	ctx context.Context,
+	input []string,
+	fromSupa []string,
+	desc bool,
+	autoClean bool,
+	supabaseConfig string,
+) ([]*tmessage.Dialog, map[cleanupKey]cleanupFunc, error) {
 	var dialogs []*tmessage.Dialog
+	cleanups := make(map[cleanupKey]cleanupFunc)
 
 	for _, p := range input {
 		var (
@@ -124,27 +137,51 @@ func collectDialogs(ctx context.Context, input []string, desc bool) ([]*tmessage
 		case strings.HasPrefix(p, "http"):
 			d, err = tmessage.Parse(tmessage.FromURL(ctx, tctx.Pool(ctx), tctx.KV(ctx), []string{p}))
 			if err != nil {
-				return nil, errors.Wrap(err, "parse from url")
+				return nil, nil, errors.Wrap(err, "parse from url")
 			}
 		default:
 			d, err = tmessage.Parse(tmessage.FromFile(ctx, tctx.Pool(ctx), tctx.KV(ctx), []string{p}, false))
 			if err != nil {
-				return nil, errors.Wrap(err, "parse from file")
+				return nil, nil, errors.Wrap(err, "parse from file")
 			}
 		}
 
 		if desc {
-			for _, dd := range d {
-				for i, j := 0, len(dd.Messages)-1; i < j; i, j = i+1, j-1 {
-					dd.Messages[i], dd.Messages[j] = dd.Messages[j], dd.Messages[i]
-				}
-			}
+			reverseDialogs(d)
 		}
 
 		dialogs = append(dialogs, d...)
 	}
 
-	return dialogs, nil
+	if len(fromSupa) > 0 {
+		d, c, err := collectDialogsFromSupabase(ctx, fromSupa, autoClean, supabaseConfig)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "parse from supabase")
+		}
+
+		if desc {
+			reverseDialogs(d)
+		}
+
+		dialogs = append(dialogs, d...)
+		for k, v := range c {
+			cleanups[k] = v
+		}
+	}
+
+	if len(cleanups) == 0 {
+		cleanups = nil
+	}
+
+	return dialogs, cleanups, nil
+}
+
+func reverseDialogs(dialogs []*tmessage.Dialog) {
+	for _, d := range dialogs {
+		for i, j := 0, len(d.Messages)-1; i < j; i, j = i+1, j-1 {
+			d.Messages[i], d.Messages[j] = d.Messages[j], d.Messages[i]
+		}
+	}
 }
 
 // resolveDest parses the input string and returns a vm.Program. It can be a CHAT, a text or a file based on expression engine.

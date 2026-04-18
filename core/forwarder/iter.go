@@ -25,3 +25,7 @@ type Elem interface {
 	AsDryRun() bool
 	AsGrouped() bool // detect and forward grouped messages
 }
+
+type AutoCleaner interface {
+	Cleanup(ctx context.Context) error
+}

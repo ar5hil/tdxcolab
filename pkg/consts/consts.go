@@ -6,13 +6,23 @@ import (
 )
 
 func init() {
-	dir, err := os.UserHomeDir()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		panic(err)
 	}
 
-	HomeDir = dir
-	DataDir = filepath.Join(dir, ".tdl")
+	HomeDir = home
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		workdir = home
+	}
+	workdir, err = filepath.Abs(workdir)
+	if err != nil {
+		workdir = home
+	}
+
+	DataDir = filepath.Join(workdir, ".tdl")
 	LogPath = filepath.Join(DataDir, "log")
 	ExtensionsPath = filepath.Join(DataDir, "extensions")
 	ExtensionsDataPath = filepath.Join(ExtensionsPath, "data")

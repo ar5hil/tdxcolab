@@ -1,0 +1,8 @@
+{
+  "url": "https://qremztwijhuvsvyzirsf.supabase.co",
+  "anon_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFyZW16dHdpamh1dnN2eXppcnNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MzgyOTMsImV4cCI6MjA5MjExNDI5M30.nw1MNJKu8lKzqaYrvAlPOLvwvXFJc6QXqnQjIKFbEvM",
+  "service_role_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFyZW16dHdpamh1dnN2eXppcnNmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjUzODI5MywiZXhwIjoyMDkyMTE0MjkzfQ._U38GDMm7LikbRM5mY3tI6h2xMhzxGH-qrbe_AECe_A",
+  "schema": "public",
+  "table": "tdl_messages",
+  "batch_size": 500
+}

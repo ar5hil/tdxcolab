@@ -12,6 +12,7 @@ import (
 	"github.com/iyear/tdl/core/forwarder"
 	"github.com/iyear/tdl/core/logctx"
 	"github.com/iyear/tdl/core/storage"
+	"github.com/iyear/tdl/pkg/supabase"
 )
 
 func NewForward() *cobra.Command {
@@ -29,6 +30,7 @@ func NewForward() *cobra.Command {
 	}
 
 	cmd.Flags().StringArrayVar(&opts.From, "from", []string{}, "messages to be forwarded, can be links or exported JSON files")
+	cmd.Flags().StringArrayVar(&opts.FromSupa, "fromsupa", []string{}, "messages to be forwarded from Supabase key CHAT_ID.TOPIC_ID")
 	cmd.Flags().StringVar(&opts.To, "to", "", "destination peer, can be a CHAT or router based on expression engine")
 	cmd.Flags().StringVar(&opts.Edit, "edit", "", "edit message or caption with expression engine. Empty means no edit")
 	cmd.Flags().Var(&opts.Mode, "mode", fmt.Sprintf("forward mode: [%s]", strings.Join(forwarder.ModeNames(), ", ")))
@@ -37,6 +39,8 @@ func NewForward() *cobra.Command {
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "do not actually send messages, just show how they would be sent")
 	cmd.Flags().BoolVar(&opts.Single, "single", false, "do not automatically detect and forward grouped messages")
 	cmd.Flags().BoolVar(&opts.Desc, "desc", false, "forward messages in reverse order for each input peer")
+	cmd.Flags().BoolVar(&opts.AutoClean, "auto-clean", false, "delete successfully forwarded Supabase rows")
+	cmd.Flags().StringVar(&opts.SupabaseConfig, "supabase-config", supabase.DefaultConfigPath, "Supabase config JSON path")
 
 	return cmd
 }

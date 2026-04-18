@@ -15,6 +15,7 @@ import (
 	"github.com/iyear/tdl/app/chat"
 	"github.com/iyear/tdl/core/logctx"
 	"github.com/iyear/tdl/core/storage"
+	"github.com/iyear/tdl/pkg/supabase"
 )
 
 var limiter = ratelimit.New(rate.Every(500*time.Millisecond), 2)
@@ -105,6 +106,8 @@ func NewChatExport() *cobra.Command {
 	cmd.Flags().IntSliceVarP(&opts.Input, input, "i", []int{}, "input data, depends on export type")
 	cmd.Flags().StringVarP(&opts.Filter, "filter", "f", "true", "filter messages by expression, defaults to match all messages. Specify '-' to see available fields")
 	cmd.Flags().StringVarP(&opts.Output, "output", "o", "tdl-export.json", "output JSON file path")
+	cmd.Flags().BoolVar(&opts.Supabase, "supabase", false, "export to Supabase instead of JSON output file")
+	cmd.Flags().StringVar(&opts.SupabaseConfig, "supabase-config", supabase.DefaultConfigPath, "Supabase config JSON path")
 	cmd.Flags().BoolVar(&opts.WithContent, "with-content", false, "export with message content")
 	cmd.Flags().BoolVar(&opts.Raw, "raw", false, "export raw message struct of Telegram MTProto API, useful for debugging")
 	cmd.Flags().BoolVar(&opts.All, "all", false, "export all messages including non-media messages, but still affected by filter and type flag")

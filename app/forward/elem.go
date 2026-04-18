@@ -1,6 +1,8 @@
 package forward
 
 import (
+	"context"
+
 	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
 
@@ -13,6 +15,7 @@ type iterElem struct {
 	to           peers.Peer
 	thread       int
 	modeOverride forwarder.Mode
+	cleanup      cleanupFunc
 	opts         iterOptions
 }
 
@@ -36,3 +39,11 @@ func (i *iterElem) AsSilent() bool { return i.opts.silent }
 func (i *iterElem) AsDryRun() bool { return i.opts.dryRun }
 
 func (i *iterElem) AsGrouped() bool { return i.opts.grouped }
+
+func (i *iterElem) Cleanup(ctx context.Context) error {
+	if i.cleanup == nil {
+		return nil
+	}
+
+	return i.cleanup(ctx)
+}

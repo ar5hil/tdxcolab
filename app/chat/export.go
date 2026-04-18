@@ -2,14 +2,11 @@ package chat
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/expr-lang/expr"
 	"github.com/fatih/color"
-	"github.com/go-faster/jx"
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/telegram/query"
@@ -28,16 +25,18 @@ import (
 //go:generate go-enum --names --values --flag --nocase
 
 type ExportOptions struct {
-	Type        ExportType
-	Chat        string
-	Thread      int // topic id in forum, message id in group
-	Input       []int
-	Output      string
-	Filter      string
-	OnlyMedia   bool
-	WithContent bool
-	Raw         bool
-	All         bool
+	Type           ExportType
+	Chat           string
+	Thread         int // topic id in forum, message id in group
+	Input          []int
+	Output         string
+	Filter         string
+	OnlyMedia      bool
+	WithContent    bool
+	Raw            bool
+	All            bool
+	Supabase       bool
+	SupabaseConfig string
 }
 
 type Message struct {
@@ -117,15 +116,6 @@ func Export(ctx context.Context, c *telegram.Client, kvd storage.Storage, opts E
 	case ExportTypeLast:
 	}
 
-	f, err := os.Create(opts.Output)
-	if err != nil {
-		return err
-	}
-	defer multierr.AppendInvoke(&rerr, multierr.Close(f))
-
-	enc := jx.NewStreamingEncoder(f, 512)
-	defer multierr.AppendInvoke(&rerr, multierr.Close(enc))
-
 	// process thread is reply type and peer is broadcast channel,
 	// so we need to set discussion group id instead of broadcast id
 	id := peer.ID()
@@ -141,13 +131,15 @@ func Export(ctx context.Context, c *telegram.Client, kvd storage.Storage, opts E
 		}
 	}
 
-	enc.ObjStart()
-	defer enc.ObjEnd()
-	enc.Field("id", func(e *jx.Encoder) { e.Int64(id) })
-
-	enc.FieldStart("messages")
-	enc.ArrStart()
-	defer enc.ArrEnd()
+	sink, err := newExportSink(ctx, opts, id)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := sink.Close(); err != nil {
+			rerr = multierr.Append(rerr, fmt.Errorf("close export sink: %w", err))
+		}
+	}()
 
 	count := int64(0)
 
@@ -204,11 +196,9 @@ loop:
 			t.Raw = m
 		}
 
-		mb, err := json.Marshal(t)
-		if err != nil {
-			return fmt.Errorf("failed to marshal message: %w", err)
+		if err = sink.Add(t); err != nil {
+			return fmt.Errorf("failed to export message: %w", err)
 		}
-		enc.Raw(mb)
 
 		count++
 		tracker.SetValue(count)

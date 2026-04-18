@@ -25,10 +25,11 @@ import (
 type Mode int
 
 type Options struct {
-	Pool     dcpool.Pool
-	Threads  int
-	Iter     Iter
-	Progress Progress
+	Pool      dcpool.Pool
+	Threads   int
+	Iter      Iter
+	Progress  Progress
+	AutoClean bool
 }
 
 type Forwarder struct {
@@ -54,6 +55,7 @@ func (f *Forwarder) Forward(ctx context.Context) error {
 	for f.opts.Iter.Next(ctx) {
 		elem := f.opts.Iter.Value()
 		if _, ok := f.sent[f.tuple(elem.From(), elem.Msg())]; ok {
+			f.cleanup(ctx, elem)
 			// skip grouped messages
 			continue
 		}
@@ -67,6 +69,7 @@ func (f *Forwarder) Forward(ctx context.Context) error {
 			if err = f.forwardMessage(ctx, elem, grouped...); err != nil {
 				continue
 			}
+			f.cleanup(ctx, elem)
 
 			continue
 		}
@@ -78,9 +81,28 @@ func (f *Forwarder) Forward(ctx context.Context) error {
 			}
 			continue
 		}
+		f.cleanup(ctx, elem)
 	}
 
 	return f.opts.Iter.Err()
+}
+
+func (f *Forwarder) cleanup(ctx context.Context, elem Elem) {
+	if !f.opts.AutoClean {
+		return
+	}
+
+	cleaner, ok := elem.(AutoCleaner)
+	if !ok {
+		return
+	}
+
+	if err := cleaner.Cleanup(ctx); err != nil {
+		logctx.From(ctx).Warn("Auto clean failed",
+			zap.Int64("from", elem.From().ID()),
+			zap.Int("message", elem.Msg().ID),
+			zap.Error(err))
+	}
 }
 
 func (f *Forwarder) forwardMessage(ctx context.Context, elem Elem, grouped ...*tg.Message) (rerr error) {
